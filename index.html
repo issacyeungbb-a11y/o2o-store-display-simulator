@@ -521,6 +521,37 @@
       }, {});
     }
 
+    // 步驟二使用混排池，盡量避免同款商品連續出現，提升分類訓練效果。
+    function createMixedStage2Pool(items) {
+      const grouped = items.reduce((acc, item) => {
+        acc[item.key] = acc[item.key] || [];
+        acc[item.key].push(item.uid);
+        return acc;
+      }, {});
+
+      Object.values(grouped).forEach((uids) => {
+        uids.sort(() => Math.random() - 0.5);
+      });
+
+      const result = [];
+      let lastKey = null;
+
+      while (result.length < items.length) {
+        const candidates = Object.entries(grouped)
+          .filter(([, uids]) => uids.length > 0)
+          .sort((a, b) => b[1].length - a[1].length);
+
+        let chosen = candidates.find(([key]) => key !== lastKey) || candidates[0];
+        if (!chosen) break;
+
+        const [chosenKey, chosenUids] = chosen;
+        result.push(chosenUids.shift());
+        lastKey = chosenKey;
+      }
+
+      return result;
+    }
+
     function currentSortCategory() {
       return CATEGORY_ORDER[state.sortCategoryIndex];
     }
@@ -618,7 +649,7 @@
       if (state.stage === 1 && Object.keys(state.scanned).length === 27) {
         state.stage = 2;
         state.stage2Zones = {
-          pool: state.activeBatch.map((item) => item.uid),
+          pool: createMixedStage2Pool(state.activeBatch),
           "罐頭食品": [],
           "飲品類": [],
           "乾貨": []

@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>O2O 達人店長 - 貨品陳列模擬器</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --bg-a: #020617;
+      --bg-b: #0f172a;
+      --bg-c: #11345d;
+      --glass: rgba(15, 23, 42, 0.55);
+      --glass-strong: rgba(15, 23, 42, 0.75);
+      --line: rgba(148, 163, 184, 0.24);
+      --line-strong: rgba(125, 211, 252, 0.55);
+      --glow: 0 18px 45px rgba(8, 47, 73, 0.35);
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --bad: #f87171;
+      --info: #38bdf8;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      color: #e2e8f0;
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.15), transparent 25%),
+        radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 24%),
+        linear-gradient(145deg, var(--bg-a), var(--bg-b) 45%, var(--bg-c));
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 36px 36px;
+      mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.45), transparent 85%);
+    }
+
+    .glass {
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.68), rgba(15, 23, 42, 0.46));
+      border: 1px solid var(--line);
+      box-shadow: var(--glow);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .shelf-panel {
+      position: relative;
+      overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.02)),
+        repeating-linear-gradient(
+          180deg,
+          rgba(148, 163, 184, 0.08) 0,
+          rgba(148, 163, 184, 0.08) 2px,
+          transparent 2px,
+          transparent 90px
+        ),
+        linear-gradient(180deg, rgba(30, 41, 59, 0.88), rgba(15, 23, 42, 0.78));
+    }
+
+    .shelf-panel::after {
+      content: "";
+      position: absolute;
+      inset: auto 0 0;
+      height: 100%;
+      background:
+        linear-gradient(180deg, transparent 0 18%, rgba(148, 163, 184, 0.08) 18% 19%, transparent 19% 48%, rgba(148, 163, 184, 0.08) 48% 49%, transparent 49% 78%, rgba(148, 163, 184, 0.08) 78% 79%, transparent 79%);
+      pointer-events: none;
+    }
+
+    .typing-text::after {
+      content: "";
+      display: inline-block;
+      width: 0.65rem;
+      height: 1.1rem;
+      margin-left: 0.25rem;
+      vertical-align: -0.1rem;
+      background: #e2e8f0;
+      animation: blink 0.9s steps(1) infinite;
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: 0;
+      }
+    }
+
+    .product-card {
+      touch-action: manipulation;
+      user-select: none;
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+    }
+
+    .product-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(125, 211, 252, 0.45);
+    }
+
+    .product-card.dragging {
+      opacity: 0.45;
+      transform: scale(0.98);
+    }
+
+    .product-card.selected {
+      border-color: #facc15;
+      box-shadow: 0 0 0 2px rgba(250, 204, 21, 0.55), 0 12px 24px rgba(15, 23, 42, 0.4);
+    }
+
+    .drop-zone {
+      transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
+    }
+
+    .drop-zone.highlight {
+      border-color: var(--line-strong);
+      background: rgba(14, 165, 233, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .slot-filled {
+      border-color: rgba(74, 222, 128, 0.4);
+      background: rgba(34, 197, 94, 0.08);
+    }
+
+    .hint-success {
+      border-color: rgba(74, 222, 128, 0.45);
+      background: rgba(34, 197, 94, 0.12);
+      color: #bbf7d0;
+    }
+
+    .hint-error {
+      border-color: rgba(248, 113, 113, 0.45);
+      background: rgba(248, 113, 113, 0.12);
+      color: #fecaca;
+    }
+
+    .hint-info {
+      border-color: rgba(56, 189, 248, 0.45);
+      background: rgba(56, 189, 248, 0.12);
+      color: #bae6fd;
+    }
+
+    .warehouse-box {
+      background:
+        linear-gradient(135deg, rgba(180, 83, 9, 0.95), rgba(120, 53, 15, 0.9)),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 25px rgba(15, 23, 42, 0.28);
+    }
+
+    .scan-barcode {
+      letter-spacing: 0.18em;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
+    @media (min-width: 1024px) {
+      .app-shell {
+        grid-template-columns: 320px minmax(0, 1fr);
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="min-h-screen p-4 md:p-6"></div>
+
+  <script>
+    const TODAY = "2026-03-09";
+    const CATEGORY_ORDER = ["罐頭食品", "飲品類", "乾貨"];
+    const DEFECTS = ["凹陷變形", "包裝破洞", "漏液"];
+
+    const PRODUCT_CATALOG = [
+      { key: "corn-can", name: "粟米罐頭", category: "罐頭食品", image: "🌽", baseExpiry: "2026-06-01", barcode: "BC-CAN-001-8135" },
+      { key: "bean-can", name: "紅腰豆罐頭", category: "罐頭食品", image: "🫘", baseExpiry: "2026-06-15", barcode: "BC-CAN-002-2744" },
+      { key: "tomato-can", name: "番茄罐頭", category: "罐頭食品", image: "🍅", baseExpiry: "2026-05-28", barcode: "BC-CAN-003-4458" },
+      { key: "matcha-drink", name: "抹茶味飲料", category: "飲品類", image: "🍵", baseExpiry: "2026-04-22", barcode: "BC-DRK-001-1103" },
+      { key: "milk", name: "牛奶", category: "飲品類", image: "🥛", baseExpiry: "2026-03-20", barcode: "BC-DRK-002-3184" },
+      { key: "coffee", name: "咖啡", category: "飲品類", image: "☕", baseExpiry: "2026-05-02", barcode: "BC-DRK-003-7821" },
+      { key: "thai-noodle", name: "泰國船麵", category: "乾貨", image: "🍜", baseExpiry: "2026-07-01", barcode: "BC-DRY-001-6395" },
+      { key: "cookies", name: "餅乾", category: "乾貨", image: "🍪", baseExpiry: "2026-04-10", barcode: "BC-DRY-002-9206" },
+      { key: "instant-noodle", name: "即食麵", category: "乾貨", image: "🍜", baseExpiry: "2026-06-12", barcode: "BC-DRY-003-5110" }
+    ];
+
+    const state = {
+      stage: 0,
+      score: 100,
+      batches: [],
+      activeBatch: [],
+      scanned: {},
+      sortableItems: [],
+      sortCategoryIndex: 0,
+      stage2Zones: {},
+      stage2Passed: false,
+      stage3Zones: {},
+      stage3Passed: false,
+      stage4Assignments: {},
+      stage4PassedCategories: {},
+      selectedItemUid: null,
+      selectedBatchIndex: null,
+      touchMode: window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window,
+      hint: {
+        type: "info",
+        text: "歡迎來到 O2O 達人店長訓練。先打開貨箱，開始今天的 27 件貨品任務。"
+      },
+      npc: {
+        name: "阿明",
+        avatar: "👨‍🏫",
+        fullText: "歡迎來到 O2O 達人店長訓練。先打開貨箱，開始今天的 27 件貨品任務。",
+        typingText: "",
+        timer: null
+      }
+    };
+
+    function seededRandom(seed) {
+      let t = seed + 0x6d2b79f5;
+      return function() {
+        t += 0x6d2b79f5;
+        let x = Math.imul(t ^ (t >>> 15), 1 | t);
+        x ^= x + Math.imul(x ^ (x >>> 7), 61 | x);
+        return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function shuffleWithRandom(arr, randomFn) {
+      const cloned = [...arr];
+      for (let i = cloned.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(randomFn() * (i + 1));
+        [cloned[i], cloned[j]] = [cloned[j], cloned[i]];
+      }
+      return cloned;
+    }
+
+    function offsetDate(dateStr, days) {
+      const date = new Date(dateStr + "T00:00:00");
+      date.setDate(date.getDate() + days);
+      return date.toISOString().slice(0, 10);
+    }
+
+    function isExpired(expiry) {
+      return expiry < TODAY;
+    }
+
+    function clampScore() {
+      state.score = Math.max(0, state.score);
+    }
+
+    function penalize(message) {
+      state.score -= 10;
+      clampScore();
+      showHint("error", message + " 已扣 10 分。");
+    }
+
+    function showHint(type, text) {
+      state.hint = { type, text };
+      renderStatus();
+    }
+
+    function speak(text) {
+      state.npc.fullText = text;
+      state.npc.typingText = "";
+      if (state.npc.timer) {
+        clearInterval(state.npc.timer);
+      }
+      let index = 0;
+      state.npc.timer = setInterval(() => {
+        index += 1;
+        state.npc.typingText = text.slice(0, index);
+        renderStatus();
+        if (index >= text.length) {
+          clearInterval(state.npc.timer);
+          state.npc.timer = null;
+        }
+      }, 22);
+      renderStatus();
+    }
+
+    function progressPercent() {
+      if (state.stage === 0) return 0;
+      if (state.stage === 1) {
+        const scannedCount = Object.keys(state.scanned).length;
+        return Math.round((scannedCount / 27) * 25);
+      }
+      if (state.stage === 2) return state.stage2Passed ? 50 : 38;
+      if (state.stage === 3) return state.stage3Passed ? 75 : 63;
+      if (state.stage === 4) {
+        const passed = Object.keys(state.stage4PassedCategories).length;
+        return Math.min(100, 75 + Math.round((passed / 3) * 25));
+      }
+      return 100;
+    }
+
+    function progressText() {
+      if (state.stage === 0) return "開場：準備開箱";
+      if (state.stage === 1) return "流程 1 / 4：條碼掃描";
+      if (state.stage === 2) return "流程 2 / 4：貨品分類";
+      if (state.stage === 3) return "流程 3 / 4：合併判斷";
+      if (state.stage === 4 && Object.keys(state.stage4PassedCategories).length < 3) {
+        return `流程 4 / 4：日期排序（${CATEGORY_ORDER[state.sortCategoryIndex]}）`;
+      }
+      return "流程完成：訓練結束";
+    }
+
+    function generateBatches() {
+      const batches = [];
+      for (let batchIndex = 1; batchIndex <= 5; batchIndex += 1) {
+        const randomFn = seededRandom(batchIndex * 97);
+        const batchItems = [];
+        PRODUCT_CATALOG.forEach((product) => {
+          for (let copyNo = 1; copyNo <= 3; copyNo += 1) {
+            const dayShift = Math.floor(randomFn() * 18) - 5;
+            batchItems.push({
+              uid: `B${batchIndex}-${product.key}-${copyNo}`,
+              batchNo: batchIndex,
+              key: product.key,
+              name: product.name,
+              category: product.category,
+              image: product.image,
+              barcode: product.barcode,
+              copyNo,
+              expiry: offsetDate(product.baseExpiry, dayShift),
+              baseExpiry: product.baseExpiry,
+              isDamaged: false,
+              defect: "",
+              scanned: false
+            });
+          }
+        });
+
+        const damageTargets = shuffleWithRandom(batchItems.map((item) => item.uid), randomFn).slice(0, 5);
+        damageTargets.forEach((uid, index) => {
+          const target = batchItems.find((item) => item.uid === uid);
+          target.isDamaged = true;
+          target.defect = DEFECTS[index % DEFECTS.length];
+        });
+
+        const remaining = batchItems.filter((item) => !item.isDamaged);
+        const expiredTargets = shuffleWithRandom(remaining.map((item) => item.uid), randomFn).slice(0, 5);
+        expiredTargets.forEach((uid, index) => {
+          const target = batchItems.find((item) => item.uid === uid);
+          target.expiry = offsetDate(TODAY, -(index + 1));
+        });
+
+        batches.push(batchItems);
+      }
+      return batches;
+    }
+
+    function resetTraining() {
+      state.stage = 0;
+      state.score = 100;
+      state.batches = generateBatches();
+      state.activeBatch = [];
+      state.scanned = {};
+      state.sortableItems = [];
+      state.sortCategoryIndex = 0;
+      state.stage2Zones = {};
+      state.stage2Passed = false;
+      state.stage3Zones = {};
+      state.stage3Passed = false;
+      state.stage4Assignments = {};
+      state.stage4PassedCategories = {};
+      state.selectedItemUid = null;
+      state.selectedBatchIndex = null;
+      showHint("info", "已重設訓練，請重新打開一個貨箱。");
+      speak("今天會模擬門店到貨流程。先從貨箱挑出一批貨，再一步步完成掃描、分類與陳列。");
+      renderApp();
+    }
+
+    function chooseBatch() {
+      const randomIndex = Math.floor(Math.random() * state.batches.length);
+      state.selectedBatchIndex = randomIndex;
+      state.activeBatch = state.batches[randomIndex].map((item) => ({ ...item }));
+      state.scanned = {};
+      state.stage = 1;
+      showHint("success", "已選中 1 批，共 27 件，請開始掃描條碼。");
+      speak("很好，這批貨一共有 27 件。先逐件掃描條碼，確認每件貨都已入系統。");
+      renderApp();
+    }
+
+    function getItem(uid) {
+      return state.activeBatch.find((item) => item.uid === uid) || state.sortableItems.find((item) => item.uid === uid);
+    }
+
+    function scanItem(uid) {
+      state.scanned[uid] = true;
+      const item = getItem(uid);
+      if (item) item.scanned = true;
+      const scannedCount = Object.keys(state.scanned).length;
+      if (scannedCount === 27) {
+        showHint("success", "27 件已全數掃描完成，可以進入下一步。");
+        speak("條碼掃描完成，接下來把貨品分到正確類別貨架。");
+      } else {
+        showHint("success", `已掃描 ${scannedCount} / 27：${item.name} #${item.copyNo}`);
+      }
+      renderApp();
+    }
+
+    function moveItemToStage2(uid, zone) {
+      const currentZone = findStage2ZoneOfItem(uid);
+      if (currentZone === zone) return;
+      if (currentZone) {
+        state.stage2Zones[currentZone] = state.stage2Zones[currentZone].filter((itemUid) => itemUid !== uid);
+      }
+      state.stage2Zones[zone].push(uid);
+      state.selectedItemUid = null;
+      renderApp();
+    }
+
+    function findStage2ZoneOfItem(uid) {
+      return Object.keys(state.stage2Zones).find((zone) => state.stage2Zones[zone].includes(uid));
+    }
+
+    function checkStage2() {
+      const allPlaced = CATEGORY_ORDER.every((zone) => state.stage2Zones[zone].length > 0) && state.stage2Zones.pool.length === 0;
+      if (!allPlaced) {
+        penalize("分類尚未完成，27 件貨品必須全部放到三個類別架。");
+        renderApp();
+        return;
+      }
+      const wrongItems = [];
+      CATEGORY_ORDER.forEach((zone) => {
+        state.stage2Zones[zone].forEach((uid) => {
+          const item = getItem(uid);
+          if (item.category !== zone) {
+            wrongItems.push(`${item.name} #${item.copyNo} 被放到 ${zone}`);
+          }
+        });
+      });
+      if (wrongItems.length > 0) {
+        penalize("分類有誤：" + wrongItems.slice(0, 3).join("、"));
+      } else {
+        state.stage2Passed = true;
+        showHint("success", "分類正確，27 件貨品都已回到對應類別。");
+        speak("分類做得不錯。現在要判斷哪些貨可以上架，哪些要列作損壞或過期。");
+      }
+      renderApp();
+    }
+
+    function moveItemToStage3(uid, zone) {
+      const currentZone = findStage3ZoneOfItem(uid);
+      if (currentZone === zone) return;
+      if (currentZone) {
+        state.stage3Zones[currentZone] = state.stage3Zones[currentZone].filter((itemUid) => itemUid !== uid);
+      }
+      state.stage3Zones[zone].push(uid);
+      state.selectedItemUid = null;
+      renderApp();
+    }
+
+    function findStage3ZoneOfItem(uid) {
+      return Object.keys(state.stage3Zones).find((zone) => state.stage3Zones[zone].includes(uid));
+    }
+
+    function checkStage3() {
+      const zones = ["pool", "可上架貨架", "貨品已損壞", "貨品已過期"];
+      const allPlaced = state.stage3Zones.pool.length === 0 && zones.slice(1).every((zone) => state.stage3Zones[zone]);
+      if (!allPlaced) {
+        penalize("合併判斷尚未完成，仍有貨品未放入目標貨架。");
+        renderApp();
+        return;
+      }
+      const wrongItems = [];
+      ["可上架貨架", "貨品已損壞", "貨品已過期"].forEach((zone) => {
+        state.stage3Zones[zone].forEach((uid) => {
+          const item = getItem(uid);
+          const expected = item.isDamaged ? "貨品已損壞" : (isExpired(item.expiry) ? "貨品已過期" : "可上架貨架");
+          if (zone !== expected) {
+            wrongItems.push(`${item.name} #${item.copyNo} 應放到 ${expected}`);
+          }
+        });
+      });
+      if (wrongItems.length > 0) {
+        penalize("合併判斷有誤：" + wrongItems.slice(0, 3).join("、"));
+      } else {
+        state.stage3Passed = true;
+        state.sortableItems = state.stage3Zones["可上架貨架"].map((uid) => ({ ...getItem(uid) }));
+        initializeStage4Assignments();
+        showHint("success", `判斷成功，可上架 ${state.sortableItems.length} 件，進入日期排序。`);
+        speak("接下來只處理可上架貨品。請按類別與有效日期，完成真正上架前的最後整理。");
+      }
+      renderApp();
+    }
+
+    function initializeStage4Assignments() {
+      state.stage4Assignments = {};
+      CATEGORY_ORDER.forEach((category) => {
+        const items = state.sortableItems.filter((item) => item.category === category);
+        const groupEntries = Object.entries(groupByName(items));
+        state.stage4Assignments[category] = {
+          pool: items.map((item) => item.uid),
+          slots: groupEntries.flatMap(([name, namedItems]) =>
+            namedItems.map((_, index) => ({
+              slotId: `${category}-${name}-${index + 1}`,
+              name,
+              index,
+              uid: null
+            }))
+          )
+        };
+      });
+      state.sortCategoryIndex = 0;
+      state.stage4PassedCategories = {};
+    }
+
+    function groupByName(items) {
+      return items.reduce((acc, item) => {
+        acc[item.name] = acc[item.name] || [];
+        acc[item.name].push(item);
+        return acc;
+      }, {});
+    }
+
+    function currentSortCategory() {
+      return CATEGORY_ORDER[state.sortCategoryIndex];
+    }
+
+    function moveItemToStage4(uid, slotId) {
+      const category = currentSortCategory();
+      const bucket = state.stage4Assignments[category];
+      if (!bucket) return;
+      bucket.pool = bucket.pool.filter((itemUid) => itemUid !== uid);
+      bucket.slots.forEach((slot) => {
+        if (slot.uid === uid) slot.uid = null;
+      });
+      const slot = bucket.slots.find((entry) => entry.slotId === slotId);
+      if (!slot) return;
+      if (slot.uid) {
+        bucket.pool.push(slot.uid);
+      }
+      slot.uid = uid;
+      state.selectedItemUid = null;
+      renderApp();
+    }
+
+    function returnStage4ItemToPool(uid) {
+      const category = currentSortCategory();
+      const bucket = state.stage4Assignments[category];
+      bucket.slots.forEach((slot) => {
+        if (slot.uid === uid) slot.uid = null;
+      });
+      if (!bucket.pool.includes(uid)) {
+        bucket.pool.push(uid);
+      }
+      state.selectedItemUid = null;
+      renderApp();
+    }
+
+    function checkStage4Category() {
+      const category = currentSortCategory();
+      const bucket = state.stage4Assignments[category];
+      if (bucket.pool.length > 0 || bucket.slots.some((slot) => !slot.uid)) {
+        penalize(`${category} 尚未完成排序，請把所有貨品放入對應名稱格。`);
+        renderApp();
+        return;
+      }
+
+      const groupedSlots = bucket.slots.reduce((acc, slot) => {
+        acc[slot.name] = acc[slot.name] || [];
+        acc[slot.name].push(slot);
+        return acc;
+      }, {});
+
+      const issues = [];
+      Object.entries(groupedSlots).forEach(([name, slots]) => {
+        const items = slots.map((slot) => getItem(slot.uid));
+        if (items.some((item) => item.name !== name)) {
+          issues.push(`${name} 的名稱格放入了不同商品`);
+          return;
+        }
+        const expiries = items.map((item) => item.expiry);
+        const sorted = [...expiries].sort();
+        if (JSON.stringify(expiries) !== JSON.stringify(sorted)) {
+          issues.push(`${name} 的日期沒有由早到晚`);
+        }
+      });
+
+      if (issues.length > 0) {
+        penalize("排序有誤：" + issues.slice(0, 2).join("、"));
+      } else {
+        state.stage4PassedCategories[category] = true;
+        showHint("success", `${category} 排序正確。`);
+        const nextIndex = state.sortCategoryIndex + 1;
+        if (nextIndex >= CATEGORY_ORDER.length) {
+          state.sortCategoryIndex = CATEGORY_ORDER.length - 1;
+          speak("太好了，三個類別都完成上架排序。你已完成整個門店訓練流程。");
+        } else {
+          speak(`${category} 排序完成。繼續處理下一類：${CATEGORY_ORDER[nextIndex]}。`);
+        }
+      }
+      renderApp();
+    }
+
+    function goNextSortCategory() {
+      const category = currentSortCategory();
+      if (!state.stage4PassedCategories[category]) {
+        showHint("info", `請先通過 ${category} 的排序檢查。`);
+        return;
+      }
+      if (state.sortCategoryIndex < CATEGORY_ORDER.length - 1) {
+        state.sortCategoryIndex += 1;
+        showHint("info", `已切換到 ${currentSortCategory()}。`);
+      }
+      renderApp();
+    }
+
+    function nextStage() {
+      if (state.stage === 1 && Object.keys(state.scanned).length === 27) {
+        state.stage = 2;
+        state.stage2Zones = {
+          pool: state.activeBatch.map((item) => item.uid),
+          "罐頭食品": [],
+          "飲品類": [],
+          "乾貨": []
+        };
+        showHint("info", "開始分類：把 27 件貨品拖到正確類別架。");
+        speak("現在請把全部貨品分到罐頭食品、飲品類、乾貨三個架上。");
+      } else if (state.stage === 2 && state.stage2Passed) {
+        state.stage = 3;
+        state.stage3Zones = {
+          pool: state.activeBatch.map((item) => item.uid),
+          "可上架貨架": [],
+          "貨品已損壞": [],
+          "貨品已過期": []
+        };
+        showHint("info", "開始判斷可上架、損壞與過期。");
+        speak("把每件貨依狀態放到正確貨架，只有狀態正確的商品才能真正上架。");
+      } else if (state.stage === 3 && state.stage3Passed) {
+        state.stage = 4;
+        showHint("info", `先處理 ${currentSortCategory()}，依名稱與日期完成排序。`);
+        speak(`最後一步，先從 ${currentSortCategory()} 開始，把同名商品按有效日期由早到晚排列。`);
+      }
+      state.selectedItemUid = null;
+      renderApp();
+    }
+
+    function hintClass(type) {
+      if (type === "success") return "hint-success";
+      if (type === "error") return "hint-error";
+      return "hint-info";
+    }
+
+    function categoryBadge(category) {
+      const colors = {
+        "罐頭食品": "bg-sky-500/20 text-sky-200 border-sky-400/30",
+        "飲品類": "bg-emerald-500/20 text-emerald-200 border-emerald-400/30",
+        "乾貨": "bg-amber-500/20 text-amber-100 border-amber-300/30"
+      };
+      return colors[category] || "bg-slate-500/20 text-slate-100 border-slate-300/30";
+    }
+
+    function renderProductCard(item, options = {}) {
+      const selected = state.selectedItemUid === item.uid;
+      const scanned = !!state.scanned[item.uid];
+      const clickable = options.clickable !== false;
+      return `
+        <article
+          class="product-card glass rounded-2xl border p-3 ${selected ? "selected" : ""} ${clickable ? "cursor-pointer" : ""}"
+          draggable="${state.touchMode ? "false" : "true"}"
+          data-role="draggable-item"
+          data-uid="${item.uid}"
+        >
+          <div class="flex items-start gap-3">
+            <div class="text-3xl leading-none">${item.image}</div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <h4 class="text-sm font-semibold text-slate-50">${item.name} <span class="text-sky-200">#${item.copyNo}</span></h4>
+                  <span class="mt-1 inline-flex rounded-full border px-2 py-0.5 text-[11px] ${categoryBadge(item.category)}">${item.category}</span>
+                </div>
+                ${options.showReturn ? `<button class="rounded-full border border-slate-400/25 px-2 py-1 text-[11px] text-slate-200 hover:border-sky-300/40" data-role="return-item" data-uid="${item.uid}">退回池</button>` : ""}
+              </div>
+              <div class="mt-2 space-y-1 text-xs text-slate-300">
+                <div>有效日期：<span class="${isExpired(item.expiry) ? "text-rose-300" : "text-slate-100"}">${item.expiry}</span></div>
+                <div>外觀狀態：<span class="${item.isDamaged ? "text-rose-300" : "text-emerald-300"}">${item.isDamaged ? item.defect : "完整無缺"}</span></div>
+              </div>
+              ${options.scanMode ? `
+                <div class="mt-3 rounded-xl border border-slate-500/20 bg-slate-950/40 p-2">
+                  <div class="scan-barcode text-[10px] text-slate-400">${item.barcode}</div>
+                  <button
+                    class="mt-2 w-full rounded-xl px-3 py-2 text-xs font-medium transition ${scanned ? "bg-emerald-500/20 text-emerald-200 border border-emerald-400/30" : "bg-sky-500/20 text-sky-100 border border-sky-400/30 hover:bg-sky-400/25"}"
+                    data-role="scan-btn"
+                    data-uid="${item.uid}"
+                    ${scanned ? "disabled" : ""}
+                  >
+                    ${scanned ? "✅ 已掃描" : "點擊條碼掃描"}
+                  </button>
+                </div>
+              ` : ""}
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderDropZone(title, key, itemUids, subtitle) {
+      const items = itemUids.map((uid) => getItem(uid)).filter(Boolean);
+      return `
+        <section
+          class="drop-zone glass min-h-[170px] rounded-3xl border border-dashed border-slate-400/25 p-4"
+          data-role="drop-zone"
+          data-zone="${key}"
+        >
+          <div class="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h3 class="text-sm font-semibold text-slate-50">${title}</h3>
+              <p class="text-xs text-slate-400">${subtitle}</p>
+            </div>
+            <span class="rounded-full bg-slate-800/80 px-2.5 py-1 text-xs text-slate-200">${items.length} 件</span>
+          </div>
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            ${items.length ? items.map((item) => renderProductCard(item)).join("") : `<div class="rounded-2xl border border-dashed border-slate-500/25 bg-slate-900/30 p-4 text-center text-xs text-slate-500">把貨品放到這裡</div>`}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderSortSlots(category) {
+      const bucket = state.stage4Assignments[category];
+      if (!bucket) return "";
+      const grouped = bucket.slots.reduce((acc, slot) => {
+        acc[slot.name] = acc[slot.name] || [];
+        acc[slot.name].push(slot);
+        return acc;
+      }, {});
+      return Object.entries(grouped).map(([name, slots]) => `
+        <section class="glass rounded-3xl border p-4">
+          <div class="mb-3 flex items-center justify-between">
+            <div>
+              <h4 class="text-sm font-semibold text-slate-50">${name}</h4>
+              <p class="text-xs text-slate-400">由左至右：有效日期由早到晚</p>
+            </div>
+            <span class="rounded-full bg-slate-900/70 px-2.5 py-1 text-xs text-slate-200">${slots.length} 格</span>
+          </div>
+          <div class="grid grid-cols-1 gap-3 md:grid-cols-3" style="grid-template-columns: repeat(${Math.min(slots.length, 3)}, minmax(0, 1fr));">
+            ${slots.map((slot, idx) => {
+              const item = slot.uid ? getItem(slot.uid) : null;
+              return `
+                <div
+                  class="drop-zone ${item ? "slot-filled" : ""} min-h-[160px] rounded-2xl border border-dashed border-slate-400/25 bg-slate-900/20 p-3"
+                  data-role="sort-slot"
+                  data-slot-id="${slot.slotId}"
+                >
+                  <div class="mb-2 flex items-center justify-between text-xs">
+                    <span class="text-slate-200">排序格 ${idx + 1}</span>
+                    <span class="text-slate-500">${name}</span>
+                  </div>
+                  ${item ? renderProductCard(item, { showReturn: true }) : `<div class="flex min-h-[110px] items-center justify-center rounded-2xl border border-dashed border-slate-500/20 text-xs text-slate-500">放入 ${name}</div>`}
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </section>
+      `).join("");
+    }
+
+    function renderStatus() {
+      const app = document.getElementById("app");
+      if (!app) return;
+      const statusBar = document.getElementById("status-bar");
+      const npcPanel = document.getElementById("npc-panel");
+      if (statusBar) {
+        statusBar.innerHTML = `
+          <div class="glass rounded-3xl border px-4 py-4 md:px-5">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div class="flex flex-wrap items-center gap-3">
+                <span class="rounded-full border border-slate-400/25 bg-slate-900/55 px-3 py-1 text-sm text-slate-200">固定日期：${TODAY}</span>
+                <span class="text-sm text-slate-300">${progressText()}</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <div class="min-w-[180px]">
+                  <div class="mb-1 flex justify-between text-xs text-slate-400">
+                    <span>進度</span>
+                    <span>${progressPercent()}%</span>
+                  </div>
+                  <div class="h-2 overflow-hidden rounded-full bg-slate-900/70">
+                    <div class="h-full rounded-full bg-gradient-to-r from-sky-400 to-cyan-300 transition-all duration-300" style="width:${progressPercent()}%"></div>
+                  </div>
+                </div>
+                <div class="rounded-2xl border border-amber-300/20 bg-amber-400/10 px-4 py-2 text-sm font-semibold text-amber-100">分數 ${state.score}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      if (npcPanel) {
+        npcPanel.innerHTML = `
+          <div class="glass rounded-3xl border p-5">
+            <div class="flex items-center gap-3">
+              <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-400/15 text-3xl">${state.npc.avatar}</div>
+              <div>
+                <div class="text-xs uppercase tracking-[0.28em] text-sky-200/70">NPC Mentor</div>
+                <h2 class="text-xl font-semibold text-white">${state.npc.name}</h2>
+              </div>
+            </div>
+            <div class="mt-5 min-h-[136px] rounded-3xl border border-slate-400/20 bg-slate-950/35 p-4 text-sm leading-7 text-slate-100">
+              <p class="typing-text">${state.npc.typingText || "&nbsp;"}</p>
+            </div>
+            <div class="mt-4 rounded-2xl border p-4 text-sm ${hintClass(state.hint.type)}">
+              <div class="mb-1 text-xs uppercase tracking-[0.22em]">Hint</div>
+              <div>${state.hint.text}</div>
+            </div>
+            ${state.touchMode ? `<div class="mt-4 rounded-2xl border border-sky-400/25 bg-sky-400/10 px-4 py-3 text-sm text-sky-100">（平板模式：先點選貨品，再點目的貨架放置）</div>` : `<div class="mt-4 rounded-2xl border border-slate-400/20 bg-slate-900/35 px-4 py-3 text-sm text-slate-300">桌面模式：可直接拖曳貨品到目標貨架。</div>`}
+          </div>
+        `;
+      }
+    }
+
+    function setupIntro() {
+      const main = document.getElementById("main-panel");
+      main.innerHTML = `
+        <section class="shelf-panel glass rounded-[2rem] border p-5 md:p-6">
+          <div class="relative z-10">
+            <div class="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <p class="text-xs uppercase tracking-[0.28em] text-sky-200/70">Stage 0</p>
+                <h1 class="mt-1 text-2xl font-semibold text-white md:text-3xl">開場：準備打開貨箱</h1>
+                <p class="mt-2 max-w-2xl text-sm leading-7 text-slate-300">本次訓練會從 5 批來貨中隨機抽出 1 批，內含 27 件商品，請依流程完成掃描、分類、判斷與上架排序。</p>
+              </div>
+              <div class="rounded-2xl border border-slate-400/20 bg-slate-950/35 px-4 py-3 text-sm text-slate-200">每批：9 款商品 x 每款 3 件 = 27 件</div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+              ${Array.from({ length: 5 }).map((_, index) => `
+                <div class="warehouse-box rounded-3xl border border-amber-100/10 p-4 text-center">
+                  <div class="text-5xl">📦</div>
+                  <div class="mt-3 text-sm font-medium text-amber-50">貨箱 ${index + 1}</div>
+                  <div class="mt-1 text-xs text-amber-100/75">待抽取批次</div>
+                </div>
+              `).join("")}
+            </div>
+
+            <div class="mt-6 flex flex-wrap gap-3">
+              <button id="open-batch-btn" class="rounded-2xl bg-gradient-to-r from-sky-400 to-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-sky-950/30 transition hover:brightness-110">打開貨箱</button>
+              <button id="reset-btn-intro" class="rounded-2xl border border-slate-300/20 bg-slate-900/40 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:border-sky-300/30">重新訓練</button>
+            </div>
+          </div>
+        </section>
+      `;
+      document.getElementById("open-batch-btn").addEventListener("click", chooseBatch);
+      document.getElementById("reset-btn-intro").addEventListener("click", resetTraining);
+    }
+
+    function setupStage1() {
+      const scannedCount = Object.keys(state.scanned).length;
+      const main = document.getElementById("main-panel");
+      main.innerHTML = `
+        <section class="shelf-panel glass rounded-[2rem] border p-5 md:p-6">
+          <div class="relative z-10">
+            <div class="mb-5 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+              <div>
+                <p class="text-xs uppercase tracking-[0.28em] text-sky-200/70">Step 1</p>
+                <h1 class="mt-1 text-2xl font-semibold text-white md:text-3xl">步驟1：27件條碼掃描</h1>
+                <p class="mt-2 text-sm text-slate-300">逐件點擊條碼掃描，全部 27 件都完成後才可以進入下一步。</p>
+              </div>
+              <div class="rounded-2xl border border-sky-300/20 bg-sky-400/10 px-4 py-3 text-sm text-sky-100">已掃描 ${scannedCount} / 27</div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
+              ${state.activeBatch.map((item) => renderProductCard(item, { scanMode: true, clickable: false })).join("")}
+            </div>
+          </div>
+        </section>
+        <div class="mt-4 flex flex-wrap justify-end gap-3">
+          <button id="reset-btn" class="rounded-2xl border border-slate-300/20 bg-slate-900/40 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:border-sky-300/30">重新訓練</button>
+          ${scannedCount === 27 ? `<button id="next-btn" class="rounded-2xl bg-gradient-to-r from-sky-400 to-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-sky-950/30 transition hover:brightness-110">下一步</button>` : ""}
+        </div>
+      `;
+
+      main.querySelectorAll('[data-role="scan-btn"]').forEach((button) => {
+        button.addEventListener("click", () => scanItem(button.dataset.uid));
+      });
+      document.getElementById("reset-btn").addEventListener("click", resetTraining);
+      const nextBtn = document.getElementById("next-btn");
+      if (nextBtn) nextBtn.addEventListener("click", nextStage);
+    }
+
+    function setupStage2() {
+      const main = document.getElementById("main-panel");
+      main.innerHTML = `
+        <section class="shelf-panel glass rounded-[2rem] border p-5 md:p-6">
+          <div class="relative z-10">
+            <div class="mb-5">
+              <p class="text-xs uppercase tracking-[0.28em] text-sky-200/70">Step 2</p>
+              <h1 class="mt-1 text-2xl font-semibold text-white md:text-3xl">步驟2：27件貨品拖放分類</h1>
+              <p class="mt-2 text-sm leading-7 text-slate-300">把待分類池的 27 件貨品放到正確的三個類別架。檢查錯誤會扣 10 分，全對才能進下一步。</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4">
+              ${renderDropZone("待分類池", "pool", state.stage2Zones.pool, "所有貨品先集中在這裡")}
+              <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                ${renderDropZone("罐頭食品", "罐頭食品", state.stage2Zones["罐頭食品"], "把所有罐頭放到這裡")}
+                ${renderDropZone("飲品類", "飲品類", state.stage2Zones["飲品類"], "把所有飲品放到這裡")}
+                ${renderDropZone("乾貨", "乾貨", state.stage2Zones["乾貨"], "把所有乾貨放到這裡")}
+              </div>
+            </div>
+          </div>
+        </section>
+        <div class="mt-4 flex flex-wrap justify-end gap-3">
+          <button id="check-stage2-btn" class="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-5 py-3 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200/35">檢查分類</button>
+          <button id="reset-btn" class="rounded-2xl border border-slate-300/20 bg-slate-900/40 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:border-sky-300/30">重新訓練</button>
+          ${state.stage2Passed ? `<button id="next-btn" class="rounded-2xl bg-gradient-to-r from-sky-400 to-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-sky-950/30 transition hover:brightness-110">下一步</button>` : ""}
+        </div>
+      `;
+      bindStage2Interactions();
+    }
+
+    function setupStage3() {
+      const main = document.getElementById("main-panel");
+      main.innerHTML = `
+        <section class="shelf-panel glass rounded-[2rem] border p-5 md:p-6">
+          <div class="relative z-10">
+            <div class="mb-5">
+              <p class="text-xs uppercase tracking-[0.28em] text-sky-200/70">Step 3</p>
+              <h1 class="mt-1 text-2xl font-semibold text-white md:text-3xl">步驟3：合併判斷（可上架 / 已損壞 / 已過期）</h1>
+              <p class="mt-2 text-sm leading-7 text-slate-300">依貨品狀態判斷去向。損壞品只能放到「貨品已損壞」，過期品只能放到「貨品已過期」，其他才能放到「可上架貨架」。</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4">
+              ${renderDropZone("待判斷池", "pool", state.stage3Zones.pool, "將全部貨品判斷後分配到正確區域")}
+              <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                ${renderDropZone("可上架貨架", "可上架貨架", state.stage3Zones["可上架貨架"], "完整且未過期的商品")}
+                ${renderDropZone("貨品已損壞", "貨品已損壞", state.stage3Zones["貨品已損壞"], "凹陷、破洞、漏液等異常")}
+                ${renderDropZone("貨品已過期", "貨品已過期", state.stage3Zones["貨品已過期"], "非損壞但已過期的商品")}
+              </div>
+            </div>
+          </div>
+        </section>
+        <div class="mt-4 flex flex-wrap justify-end gap-3">
+          <button id="check-stage3-btn" class="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-5 py-3 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200/35">檢查判斷</button>
+          <button id="reset-btn" class="rounded-2xl border border-slate-300/20 bg-slate-900/40 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:border-sky-300/30">重新訓練</button>
+          ${state.stage3Passed ? `<button id="next-btn" class="rounded-2xl bg-gradient-to-r from-sky-400 to-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-sky-950/30 transition hover:brightness-110">下一步</button>` : ""}
+        </div>
+      `;
+      bindStage3Interactions();
+    }
+
+    function setupStage4() {
+      const category = currentSortCategory();
+      const bucket = state.stage4Assignments[category];
+      const completedCount = Object.keys(state.stage4PassedCategories).length;
+      const isFinished = completedCount === CATEGORY_ORDER.length;
+      const main = document.getElementById("main-panel");
+      main.innerHTML = `
+        <section class="shelf-panel glass rounded-[2rem] border p-5 md:p-6">
+          <div class="relative z-10">
+            <div class="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+              <div>
+                <p class="text-xs uppercase tracking-[0.28em] text-sky-200/70">Step 4</p>
+                <h1 class="mt-1 text-2xl font-semibold text-white md:text-3xl">步驟4：按類別分頁日期排序</h1>
+                <p class="mt-2 text-sm leading-7 text-slate-300">每次處理一個類別。把貨品拖到同名商品的格位裡，並確保同名商品由左至右按有效日期由早到晚排列。</p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                ${CATEGORY_ORDER.map((entry, idx) => `
+                  <div class="rounded-2xl border px-3 py-2 text-sm ${state.sortCategoryIndex === idx ? "border-sky-300/35 bg-sky-400/15 text-sky-100" : state.stage4PassedCategories[entry] ? "border-emerald-300/35 bg-emerald-400/10 text-emerald-100" : "border-slate-400/20 bg-slate-900/35 text-slate-300"}">
+                    ${entry}${state.stage4PassedCategories[entry] ? " ✓" : ""}
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+
+            ${isFinished ? `
+              <div class="glass rounded-3xl border border-emerald-300/25 bg-emerald-400/10 p-6 text-center">
+                <div class="text-5xl">🏆</div>
+                <h2 class="mt-4 text-2xl font-semibold text-white">完成訓練</h2>
+                <p class="mt-3 text-sm leading-7 text-emerald-50/90">你已完成條碼掃描、類別分類、狀態判斷與日期排序。最終分數為 <span class="font-semibold text-amber-200">${state.score}</span> 分。</p>
+              </div>
+            ` : `
+              <div class="grid grid-cols-1 gap-4">
+                <section class="glass rounded-3xl border p-4">
+                  <div class="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <h3 class="text-lg font-semibold text-white">目前類別：${category}</h3>
+                      <p class="text-xs text-slate-400">待排序商品池</p>
+                    </div>
+                    <span class="rounded-full bg-slate-900/70 px-2.5 py-1 text-xs text-slate-200">${bucket.pool.length} 件待排</span>
+                  </div>
+                  <div class="drop-zone min-h-[164px] rounded-2xl border border-dashed border-slate-400/25 bg-slate-900/20 p-3" data-role="sort-pool">
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                      ${bucket.pool.length ? bucket.pool.map((uid) => renderProductCard(getItem(uid))).join("") : `<div class="rounded-2xl border border-dashed border-slate-500/25 bg-slate-950/25 p-4 text-center text-xs text-slate-500">待排序池已清空</div>`}
+                    </div>
+                  </div>
+                </section>
+                <div class="grid grid-cols-1 gap-4">
+                  ${renderSortSlots(category)}
+                </div>
+              </div>
+            `}
+          </div>
+        </section>
+        <div class="mt-4 flex flex-wrap justify-end gap-3">
+          ${!isFinished ? `<button id="check-stage4-btn" class="rounded-2xl border border-emerald-300/20 bg-emerald-400/10 px-5 py-3 text-sm font-semibold text-emerald-100 transition hover:border-emerald-200/35">檢查此類別排序</button>` : ""}
+          ${!isFinished && state.sortCategoryIndex < CATEGORY_ORDER.length - 1 ? `<button id="next-category-btn" class="rounded-2xl border border-sky-300/20 bg-sky-400/10 px-5 py-3 text-sm font-semibold text-sky-100 transition hover:border-sky-200/35">下一個類別</button>` : ""}
+          <button id="reset-btn" class="rounded-2xl border border-slate-300/20 bg-slate-900/40 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:border-sky-300/30">重新訓練</button>
+        </div>
+      `;
+      bindStage4Interactions();
+    }
+
+    function bindStage2Interactions() {
+      initDrag(
+        (uid, zone) => moveItemToStage2(uid, zone),
+        "drop-zone"
+      );
+      document.getElementById("check-stage2-btn").addEventListener("click", checkStage2);
+      document.getElementById("reset-btn").addEventListener("click", resetTraining);
+      const nextBtn = document.getElementById("next-btn");
+      if (nextBtn) nextBtn.addEventListener("click", nextStage);
+    }
+
+    function bindStage3Interactions() {
+      initDrag(
+        (uid, zone) => moveItemToStage3(uid, zone),
+        "drop-zone"
+      );
+      document.getElementById("check-stage3-btn").addEventListener("click", checkStage3);
+      document.getElementById("reset-btn").addEventListener("click", resetTraining);
+      const nextBtn = document.getElementById("next-btn");
+      if (nextBtn) nextBtn.addEventListener("click", nextStage);
+    }
+
+    function bindStage4Interactions() {
+      if (Object.keys(state.stage4PassedCategories).length < CATEGORY_ORDER.length) {
+        initStage4Drag();
+        const checkBtn = document.getElementById("check-stage4-btn");
+        if (checkBtn) checkBtn.addEventListener("click", checkStage4Category);
+        const nextCategoryBtn = document.getElementById("next-category-btn");
+        if (nextCategoryBtn) nextCategoryBtn.addEventListener("click", goNextSortCategory);
+      }
+      document.getElementById("reset-btn").addEventListener("click", resetTraining);
+    }
+
+    function initDrag(onDropAction) {
+      const cards = document.querySelectorAll('[data-role="draggable-item"]');
+      const zones = document.querySelectorAll('[data-role="drop-zone"]');
+
+      cards.forEach((card) => {
+        const uid = card.dataset.uid;
+        if (!state.touchMode) {
+          card.addEventListener("dragstart", (event) => {
+            card.classList.add("dragging");
+            event.dataTransfer.setData("text/plain", uid);
+          });
+          card.addEventListener("dragend", () => {
+            card.classList.remove("dragging");
+          });
+        } else {
+          card.addEventListener("click", (event) => {
+            event.stopPropagation();
+            state.selectedItemUid = state.selectedItemUid === uid ? null : uid;
+            renderApp();
+          });
+        }
+      });
+
+      zones.forEach((zone) => {
+        const zoneKey = zone.dataset.zone;
+        if (!state.touchMode) {
+          zone.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            zone.classList.add("highlight");
+          });
+          zone.addEventListener("dragleave", () => zone.classList.remove("highlight"));
+          zone.addEventListener("drop", (event) => {
+            event.preventDefault();
+            zone.classList.remove("highlight");
+            const uid = event.dataTransfer.getData("text/plain");
+            onDropAction(uid, zoneKey);
+          });
+        } else {
+          zone.addEventListener("click", () => {
+            if (!state.selectedItemUid) {
+              showHint("info", "請先點選一張商品卡，再點目標貨架。");
+              return;
+            }
+            onDropAction(state.selectedItemUid, zoneKey);
+          });
+        }
+      });
+    }
+
+    function initStage4Drag() {
+      const cards = document.querySelectorAll('[data-role="draggable-item"]');
+      const slots = document.querySelectorAll('[data-role="sort-slot"]');
+      const pool = document.querySelector('[data-role="sort-pool"]');
+      const returnButtons = document.querySelectorAll('[data-role="return-item"]');
+
+      cards.forEach((card) => {
+        const uid = card.dataset.uid;
+        if (!state.touchMode) {
+          card.addEventListener("dragstart", (event) => {
+            card.classList.add("dragging");
+            event.dataTransfer.setData("text/plain", uid);
+          });
+          card.addEventListener("dragend", () => card.classList.remove("dragging"));
+        } else {
+          card.addEventListener("click", (event) => {
+            event.stopPropagation();
+            if (event.target.closest('[data-role="return-item"]')) return;
+            state.selectedItemUid = state.selectedItemUid === uid ? null : uid;
+            renderApp();
+          });
+        }
+      });
+
+      slots.forEach((slot) => {
+        const slotId = slot.dataset.slotId;
+        if (!state.touchMode) {
+          slot.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            slot.classList.add("highlight");
+          });
+          slot.addEventListener("dragleave", () => slot.classList.remove("highlight"));
+          slot.addEventListener("drop", (event) => {
+            event.preventDefault();
+            slot.classList.remove("highlight");
+            moveItemToStage4(event.dataTransfer.getData("text/plain"), slotId);
+          });
+        } else {
+          slot.addEventListener("click", () => {
+            if (!state.selectedItemUid) {
+              showHint("info", "請先點選商品，再點對應的排序格。");
+              return;
+            }
+            moveItemToStage4(state.selectedItemUid, slotId);
+          });
+        }
+      });
+
+      if (pool) {
+        if (!state.touchMode) {
+          pool.addEventListener("dragover", (event) => {
+            event.preventDefault();
+            pool.classList.add("highlight");
+          });
+          pool.addEventListener("dragleave", () => pool.classList.remove("highlight"));
+          pool.addEventListener("drop", (event) => {
+            event.preventDefault();
+            pool.classList.remove("highlight");
+            returnStage4ItemToPool(event.dataTransfer.getData("text/plain"));
+          });
+        } else {
+          pool.addEventListener("click", () => {
+            if (!state.selectedItemUid) return;
+            returnStage4ItemToPool(state.selectedItemUid);
+          });
+        }
+      }
+
+      returnButtons.forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          returnStage4ItemToPool(button.dataset.uid);
+        });
+      });
+    }
+
+    function renderApp() {
+      const app = document.getElementById("app");
+      app.innerHTML = `
+        <div id="status-bar"></div>
+        <div class="app-shell mt-4 grid gap-4">
+          <aside id="npc-panel"></aside>
+          <main id="main-panel"></main>
+        </div>
+      `;
+      renderStatus();
+
+      if (state.stage === 0) {
+        setupIntro();
+      } else if (state.stage === 1) {
+        setupStage1();
+      } else if (state.stage === 2) {
+        setupStage2();
+      } else if (state.stage === 3) {
+        setupStage3();
+      } else if (state.stage === 4) {
+        setupStage4();
+      }
+    }
+
+    resetTraining();
+  </script>
+</body>
+</html>

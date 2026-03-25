@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+set -e
+
+branch="$(git branch --show-current)"
+
+if [ -z "$branch" ]; then
+  exit 0
+fi
+
+if ! git remote get-url origin >/dev/null 2>&1; then
+  echo "未設定 origin remote，已略過自動推送。"
+  exit 0
+fi
+
+echo "偵測到新 commit，正在自動推送到 origin/$branch ..."
+git push origin "$branch"

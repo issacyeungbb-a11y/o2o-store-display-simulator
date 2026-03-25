@@ -1,0 +1,14 @@
+frontend/.env.local
+frontend/dist
+frontend/node_modules
+.launcher-logs
+.DS_Store
+.vercel
+backend/.venv
+backend/__pycache__
+backend/data/*.json
+*.app
+*.command
+launch-app.applescript
+launch-app.sh
+preview.html

@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>資產總覽 AI 工作台 Preview</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=DM+Mono:wght@400;500&display=swap");
+      :root {
+        --bg: #080c12;
+        --panel: rgba(255, 255, 255, 0.04);
+        --border: rgba(255, 255, 255, 0.08);
+        --text: #f0f0f0;
+        --warm: #f5f0e8;
+        --muted: rgba(255, 255, 255, 0.4);
+        --futu: #f59e0b;
+        --ib: #60a5fa;
+        --crypto: #34d399;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at top left, rgba(245, 158, 11, 0.14), transparent 24%),
+          radial-gradient(circle at top right, rgba(52, 211, 153, 0.12), transparent 28%),
+          linear-gradient(180deg, #05070c 0%, #080c12 52%, #0d1422 100%);
+        color: var(--text);
+        font-family: system-ui, sans-serif;
+        padding: 32px;
+      }
+      .shell {
+        max-width: 1280px;
+        margin: 0 auto;
+        display: grid;
+        gap: 20px;
+      }
+      .card {
+        background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.03));
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        box-shadow: 0 28px 70px rgba(0,0,0,0.26);
+      }
+      .header {
+        padding: 24px;
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      h1, h2, h3 {
+        margin: 0;
+        font-family: "Cormorant Garamond", serif;
+        color: var(--warm);
+      }
+      h1 { font-size: 56px; line-height: 0.95; }
+      h2 { font-size: 34px; }
+      p { margin: 0; color: var(--muted); line-height: 1.8; }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 8px 12px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.04);
+        font: 12px "DM Mono", monospace;
+        letter-spacing: 0.06em;
+        margin-right: 8px;
+      }
+      .summary {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 20px;
+      }
+      .panel {
+        padding: 24px;
+        display: grid;
+        gap: 16px;
+      }
+      .donut {
+        width: 220px;
+        height: 220px;
+        border-radius: 50%;
+        margin: 0 auto;
+        background:
+          radial-gradient(circle at center, rgba(8,12,18,0.95) 0 58%, transparent 59%),
+          conic-gradient(var(--futu) 0 32%, var(--ib) 32% 69%, var(--crypto) 69% 100%);
+        display: grid;
+        place-items: center;
+      }
+      .donut strong {
+        font-family: "Cormorant Garamond", serif;
+        font-size: 42px;
+        color: var(--warm);
+      }
+      .grid-3, .grid-4, .work-grid {
+        display: grid;
+        gap: 16px;
+      }
+      .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .work-grid { grid-template-columns: minmax(0, 420px) minmax(0, 1fr); }
+      .mini {
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.03);
+      }
+      .mono { font-family: "DM Mono", monospace; }
+      .metric {
+        font-family: "Cormorant Garamond", serif;
+        font-size: 72px;
+        line-height: 0.95;
+        color: var(--warm);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th, td {
+        padding: 16px;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+        text-align: left;
+      }
+      th {
+        color: var(--muted);
+        font: 12px "DM Mono", monospace;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      .message {
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.04);
+      }
+      .assistant {
+        background: rgba(96,165,250,0.08);
+        border-color: rgba(96,165,250,0.18);
+      }
+      .suggestion {
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.03);
+      }
+      .caption {
+        font: 12px "DM Mono", monospace;
+        color: var(--muted);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .note {
+        padding: 16px;
+        border-radius: 16px;
+        border: 1px solid rgba(245,158,11,0.28);
+        background: rgba(245,158,11,0.08);
+        color: #fcd34d;
+        font: 13px "DM Mono", monospace;
+        line-height: 1.6;
+      }
+      @media (max-width: 980px) {
+        .summary, .work-grid, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+        h1 { font-size: 44px; }
+        .metric { font-size: 54px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <section class="card header">
+        <div>
+          <h1>資產總覽 AI 工作台</h1>
+          <p>新版本已改成手動資產系統。你可以自己輸入富途、IB、加密貨幣資產，或者把截圖與描述交給 AI 整理，再做全倉分析。</p>
+          <div style="margin-top: 14px;">
+            <span class="pill">已取消券商直連</span>
+            <span class="pill">手動資產庫</span>
+            <span class="pill">AI 對話分析</span>
+          </div>
+        </div>
+        <div class="note">
+          真正可互動版本請啟動 React + FastAPI。<br />
+          這個頁面只係新設計方向的靜態預覽。
+        </div>
+      </section>
+
+      <section class="card summary">
+        <div class="panel">
+          <div class="donut">
+            <div style="text-align:center;">
+              <div class="caption">總資產</div>
+              <strong>HK$0.50M</strong>
+            </div>
+          </div>
+          <div class="mini mono" style="display:grid;gap:10px;">
+            <div>富途 <strong style="float:right;color:var(--warm)">HK$158K</strong></div>
+            <div>IB <strong style="float:right;color:var(--warm)">HK$187K</strong></div>
+            <div>加密貨幣 <strong style="float:right;color:var(--warm)">HK$155K</strong></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="caption">全部資產總值</div>
+          <div class="metric">HK$500K</div>
+          <div class="grid-3">
+            <div class="mini">
+              <div class="caption">總盈虧</div>
+              <div class="mono" style="font-size:24px;color:#4ade80;">▲ HK$68,400</div>
+            </div>
+            <div class="mini">
+              <div class="caption">資產數量</div>
+              <div class="mono" style="font-size:24px;color:var(--warm);">12</div>
+            </div>
+            <div class="mini">
+              <div class="caption">位置數量</div>
+              <div class="mono" style="font-size:24px;color:var(--warm);">6</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card panel">
+        <h2>來源分佈</h2>
+        <div class="grid-4">
+          <div class="mini">
+            <h3>富途</h3>
+            <p class="mono">HK$158,600</p>
+            <p>保證金綜合、現金綜合</p>
+          </div>
+          <div class="mini">
+            <h3>盈透證券</h3>
+            <p class="mono">HK$187,200</p>
+            <p>主賬戶、美元現金</p>
+          </div>
+          <div class="mini">
+            <h3>加密貨幣</h3>
+            <p class="mono">HK$154,800</p>
+            <p>冷錢包、交易所現貨</p>
+          </div>
+          <div class="mini">
+            <h3>全部資產</h3>
+            <p class="mono">HK$500,600</p>
+            <p>支援港幣 / 美元切換</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="work-grid">
+        <div class="card panel">
+          <h2>手動輸入資產</h2>
+          <p>你可以逐項輸入來源、位置、代號、成本、現價、幣種與投資想法。</p>
+          <div class="grid-3" style="grid-template-columns:1fr 1fr;">
+            <div class="mini">來源：富途</div>
+            <div class="mini">位置：保證金綜合</div>
+            <div class="mini">代號：HK.00700</div>
+            <div class="mini">名稱：騰訊控股</div>
+            <div class="mini">數量：200</div>
+            <div class="mini">現價：368 HKD</div>
+          </div>
+        </div>
+
+        <div class="card panel">
+          <h2>AI 助理</h2>
+          <div class="message assistant">
+            <div class="caption">AI 助理</div>
+            <p>你可以貼上持倉摘要、上載富途或 IB 截圖，或者直接問我而家倉位太唔太集中。</p>
+          </div>
+          <div class="message">
+            <div class="caption">你</div>
+            <p>幫我根據呢張截圖整理富途持倉，並判斷港股同加密貨幣佔比。</p>
+          </div>
+          <div class="suggestion">
+            <div class="caption">AI 建議匯入資產</div>
+            <h3>HK.00700</h3>
+            <p>騰訊控股 · 富途 / 保證金綜合</p>
+            <p class="mono">數量 200 · 成本 318 · 現價 368 · HKD</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="card panel">
+        <h2>全部資產清單</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>資產</th>
+              <th>位置</th>
+              <th>來源</th>
+              <th>類型</th>
+              <th>數量</th>
+              <th>市值</th>
+              <th>盈虧</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>HK.00700 / 騰訊控股</td>
+              <td>富途 保證金綜合</td>
+              <td>富途</td>
+              <td>股票</td>
+              <td>200</td>
+              <td>HK$73,600</td>
+              <td style="color:#4ade80;">▲ HK$10,000</td>
+            </tr>
+            <tr>
+              <td>NVDA / NVIDIA</td>
+              <td>IB 主賬戶</td>
+              <td>盈透證券</td>
+              <td>股票</td>
+              <td>35</td>
+              <td>US$4,130</td>
+              <td style="color:#4ade80;">▲ US$560</td>
+            </tr>
+            <tr>
+              <td>BTC / Bitcoin</td>
+              <td>Ledger 冷錢包</td>
+              <td>加密貨幣</td>
+              <td>Crypto</td>
+              <td>0.35</td>
+              <td>US$24,430</td>
+              <td style="color:#4ade80;">▲ US$4,060</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </div>
+  </body>
+</html>

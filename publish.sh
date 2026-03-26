@@ -1,8 +1,9 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 
 set -e
 
-cd /Users/yinwaiyeung/Documents/Playground
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 MESSAGE="${1:-更新網站內容}"
 
@@ -14,6 +15,6 @@ if git diff --cached --quiet; then
 fi
 
 git commit -m "$MESSAGE"
-git push
+git push origin "$(git branch --show-current)"
 
 echo "已推送到 GitHub，GitHub Pages 會在幾分鐘內更新。"

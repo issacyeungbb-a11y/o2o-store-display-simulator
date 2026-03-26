@@ -734,18 +734,22 @@
       `;
     }
 
-    function renderDropZone(title, key, itemUids, subtitle) {
+    function renderDropZone(title, key, itemUids, subtitle, options = {}) {
       const items = itemUids.map((uid) => getItem(uid)).filter(Boolean);
+      const accent = options.accent || "border-slate-400/25";
+      const icon = options.icon || "📥";
+      const tip = options.tip || "";
       return `
         <section
-          class="drop-zone glass min-h-[170px] rounded-3xl border border-dashed border-slate-400/25 p-4"
+          class="drop-zone glass min-h-[170px] rounded-3xl border border-dashed ${accent} p-4"
           data-role="drop-zone"
           data-zone="${key}"
         >
           <div class="mb-3 flex items-center justify-between gap-2">
             <div>
-              <h3 class="text-sm font-semibold text-slate-50">${title}</h3>
+              <h3 class="text-sm font-semibold text-slate-50">${icon} ${title}</h3>
               <p class="text-xs text-slate-400">${subtitle}</p>
+              ${tip ? `<p class="mt-1 text-[11px] text-sky-200/85">${tip}</p>` : ""}
             </div>
             <span class="rounded-full bg-slate-800/80 px-2.5 py-1 text-xs text-slate-200">${items.length} 件</span>
           </div>
@@ -783,7 +787,7 @@
                   data-slot-id="${slot.slotId}"
                 >
                   <div class="mb-2 flex items-center justify-between text-xs">
-                    <span class="text-slate-200">排序格 ${idx + 1}</span>
+                    <span class="text-slate-200">排序格 ${idx + 1} ${idx === 0 ? "（最早）" : idx === slots.length - 1 ? "（最晚）" : ""}</span>
                     <span class="text-slate-500">${name}</span>
                   </div>
                   ${item ? renderProductCard(item, { showReturn: true }) : `<div class="flex min-h-[110px] items-center justify-center rounded-2xl border border-dashed border-slate-500/20 text-xs text-slate-500">放入 ${name}</div>`}
@@ -871,6 +875,26 @@
               `).join("")}
             </div>
 
+            <section class="mt-5 grid gap-4 xl:grid-cols-2">
+              <article class="glass rounded-3xl border p-4">
+                <h3 class="text-base font-semibold text-white">系統架構（3 區聯動）</h3>
+                <ul class="mt-3 space-y-2 text-sm leading-7 text-slate-300">
+                  <li><span class="text-sky-200">頂部狀態列</span>：固定日期、流程進度、進度條與分數，實時反映操作結果。</li>
+                  <li><span class="text-sky-200">左側 NPC 教學區</span>：阿明以打字機節奏引導任務，Hint 即時回饋成功、錯誤與下一步提示。</li>
+                  <li><span class="text-sky-200">右側互動區</span>：按 Stage 0→4 動態渲染，支援拖放與平板點選放置雙模式。</li>
+                </ul>
+              </article>
+              <article class="glass rounded-3xl border p-4">
+                <h3 class="text-base font-semibold text-white">訓練內容（4 步實戰）</h3>
+                <ol class="mt-3 space-y-2 text-sm leading-7 text-slate-300">
+                  <li><span class="text-emerald-200">步驟1 掃描</span>：27 件逐一掃碼入庫，完成先可進入下一關。</li>
+                  <li><span class="text-emerald-200">步驟2 分類</span>：從打散貨池分類到罐頭／飲品／乾貨，錯誤會扣分。</li>
+                  <li><span class="text-emerald-200">步驟3 判斷</span>：按「可上架／已損壞／已過期」完成品質與時效判定。</li>
+                  <li><span class="text-emerald-200">步驟4 排序</span>：以類別分頁，同名商品按有效日期由早到晚完成上架序。</li>
+                </ol>
+              </article>
+            </section>
+
             <div class="mt-6 flex flex-wrap gap-3">
               <button id="open-batch-btn" class="rounded-2xl bg-gradient-to-r from-sky-400 to-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-sky-950/30 transition hover:brightness-110">打開貨箱</button>
               <button id="reset-btn-intro" class="rounded-2xl border border-slate-300/20 bg-slate-900/40 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:border-sky-300/30">重新訓練</button>
@@ -926,13 +950,21 @@
               <h1 class="mt-1 text-2xl font-semibold text-white md:text-3xl">步驟2：27件貨品拖放分類</h1>
               <p class="mt-2 text-sm leading-7 text-slate-300">把待分類池的 27 件貨品放到正確的三個類別架。檢查錯誤會扣 10 分，全對才能進下一步。</p>
             </div>
+            <section class="mb-4 glass rounded-3xl border border-sky-300/20 bg-sky-400/10 p-4">
+              <h3 class="text-sm font-semibold text-sky-100">分類提示（易錯位請先對照）</h3>
+              <div class="mt-3 grid gap-2 text-xs md:grid-cols-3">
+                <div class="rounded-xl border border-sky-300/20 bg-slate-950/20 px-3 py-2 text-sky-50">🥫 罐頭食品：罐裝保存品</div>
+                <div class="rounded-xl border border-sky-300/20 bg-slate-950/20 px-3 py-2 text-sky-50">🥛 飲品類：即飲／乳飲／咖啡茶飲</div>
+                <div class="rounded-xl border border-sky-300/20 bg-slate-950/20 px-3 py-2 text-sky-50">🍪 乾貨：餅乾、麵類、常溫乾製品</div>
+              </div>
+            </section>
 
             <div class="grid grid-cols-1 gap-4">
-              ${renderDropZone("待分類池", "pool", state.stage2Zones.pool, "所有貨品先集中在這裡")}
+              ${renderDropZone("待分類池", "pool", state.stage2Zones.pool, "所有貨品先集中在這裡", { icon: "🧺", accent: "border-slate-400/30", tip: "先看卡片上的類別 badge，再放到對應貨架" })}
               <div class="grid grid-cols-1 gap-4 xl:grid-cols-3">
-                ${renderDropZone("罐頭食品", "罐頭食品", state.stage2Zones["罐頭食品"], "把所有罐頭放到這裡")}
-                ${renderDropZone("飲品類", "飲品類", state.stage2Zones["飲品類"], "把所有飲品放到這裡")}
-                ${renderDropZone("乾貨", "乾貨", state.stage2Zones["乾貨"], "把所有乾貨放到這裡")}
+                ${renderDropZone("罐頭食品", "罐頭食品", state.stage2Zones["罐頭食品"], "把所有罐頭放到這裡", { icon: "🥫", accent: "border-sky-300/35", tip: "關鍵字：罐頭／罐裝" })}
+                ${renderDropZone("飲品類", "飲品類", state.stage2Zones["飲品類"], "把所有飲品放到這裡", { icon: "🥛", accent: "border-emerald-300/35", tip: "關鍵字：飲料／牛奶／咖啡" })}
+                ${renderDropZone("乾貨", "乾貨", state.stage2Zones["乾貨"], "把所有乾貨放到這裡", { icon: "🍪", accent: "border-amber-300/35", tip: "關鍵字：餅乾／麵食／乾製" })}
               </div>
             </div>
           </div>
@@ -1008,6 +1040,14 @@
               </div>
             ` : `
               <div class="grid grid-cols-1 gap-4">
+                <section class="glass rounded-3xl border border-sky-300/20 bg-sky-400/10 p-4">
+                  <h3 class="mb-3 text-sm font-semibold text-sky-100">排序提示（先名稱，後日期）</h3>
+                  <div class="grid gap-2 text-xs text-sky-50/90 md:grid-cols-3">
+                    <div class="rounded-xl border border-sky-300/20 bg-slate-950/20 px-3 py-2">1) 先把貨品放入同名商品槽位</div>
+                    <div class="rounded-xl border border-sky-300/20 bg-slate-950/20 px-3 py-2">2) 同名由左至右：到期日由早到晚</div>
+                    <div class="rounded-xl border border-sky-300/20 bg-slate-950/20 px-3 py-2">3) 格位標示「最早→最晚」可對照</div>
+                  </div>
+                </section>
                 <section class="glass rounded-3xl border p-4">
                   <div class="mb-3 flex items-center justify-between gap-3">
                     <div>

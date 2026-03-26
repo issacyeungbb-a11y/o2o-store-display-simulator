@@ -1,0 +1,9 @@
+backend
+preview.html
+.launcher-logs
+.codex
+frontend/node_modules
+frontend/dist
+frontend/.env.local
+*.app
+*.command

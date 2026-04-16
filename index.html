@@ -194,6 +194,7 @@
 
     const state = {
       stage: 0,
+      difficulty: null,
       score: 100,
       batches: [],
       activeBatch: [],
@@ -211,12 +212,12 @@
       touchMode: window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window,
       hint: {
         type: "info",
-        text: "歡迎來到 O2O 達人店長訓練。先打開貨箱，開始今天的 27 件貨品任務。"
+        text: "歡迎來到 O2O 達人店長訓練。請選擇難度開始今次訓練。"
       },
       npc: {
         name: "阿明",
         avatar: "👨‍🏫",
-        fullText: "歡迎來到 O2O 達人店長訓練。先打開貨箱，開始今天的 27 件貨品任務。",
+        fullText: "歡迎來到 O2O 達人店長訓練。請選擇難度開始今次訓練。",
         typingText: "",
         timer: null
       }
@@ -289,7 +290,8 @@
       if (state.stage === 0) return 0;
       if (state.stage === 1) {
         const scannedCount = Object.keys(state.scanned).length;
-        return Math.round((scannedCount / 27) * 25);
+        const total = state.activeBatch.length || 1;
+        return Math.round((scannedCount / total) * 25);
       }
       if (state.stage === 2) return state.stage2Passed ? 50 : 38;
       if (state.stage === 3) return state.stage3Passed ? 75 : 63;
@@ -311,13 +313,29 @@
       return "流程完成：訓練結束";
     }
 
+    function getDifficultyCopies() {
+      return state.difficulty === 1 ? 2 : 3;
+    }
+
+    function getDifficultyItemCount() {
+      return PRODUCT_CATALOG.length * getDifficultyCopies();
+    }
+
+    function getDifficultyDamagedCount() {
+      return state.difficulty === 1 ? 3 : 5;
+    }
+
+    function getDifficultyExpiredCount() {
+      return state.difficulty === 1 ? 3 : 5;
+    }
+
     function generateBatches() {
       const batches = [];
       for (let batchIndex = 1; batchIndex <= 5; batchIndex += 1) {
         const randomFn = seededRandom(batchIndex * 97);
         const batchItems = [];
         PRODUCT_CATALOG.forEach((product) => {
-          for (let copyNo = 1; copyNo <= 3; copyNo += 1) {
+          for (let copyNo = 1; copyNo <= getDifficultyCopies(); copyNo += 1) {
             const dayShift = Math.floor(randomFn() * 18) - 5;
             batchItems.push({
               uid: `B${batchIndex}-${product.key}-${copyNo}`,
@@ -337,7 +355,7 @@
           }
         });
 
-        const damageTargets = shuffleWithRandom(batchItems.map((item) => item.uid), randomFn).slice(0, 5);
+        const damageTargets = shuffleWithRandom(batchItems.map((item) => item.uid), randomFn).slice(0, getDifficultyDamagedCount());
         damageTargets.forEach((uid, index) => {
           const target = batchItems.find((item) => item.uid === uid);
           target.isDamaged = true;
@@ -345,7 +363,7 @@
         });
 
         const remaining = batchItems.filter((item) => !item.isDamaged);
-        const expiredTargets = shuffleWithRandom(remaining.map((item) => item.uid), randomFn).slice(0, 5);
+        const expiredTargets = shuffleWithRandom(remaining.map((item) => item.uid), randomFn).slice(0, getDifficultyExpiredCount());
         expiredTargets.forEach((uid, index) => {
           const target = batchItems.find((item) => item.uid === uid);
           target.expiry = offsetDate(TODAY, -(index + 1));
@@ -358,8 +376,9 @@
 
     function resetTraining() {
       state.stage = 0;
+      state.difficulty = null;
       state.score = 100;
-      state.batches = generateBatches();
+      state.batches = [];
       state.activeBatch = [];
       state.scanned = {};
       state.sortableItems = [];
@@ -372,8 +391,23 @@
       state.stage4PassedCategories = {};
       state.selectedItemUid = null;
       state.selectedBatchIndex = null;
-      showHint("info", "已重設訓練，請重新打開一個貨箱。");
-      speak("今天會模擬門店到貨流程。先從貨箱挑出一批貨，再一步步完成掃描、分類與陳列。");
+      showHint("info", "已重設訓練，請重新選擇難度。");
+      speak("歡迎來到 O2O 達人店長訓練！請選擇難度，開始今次的收貨上架練習。");
+      renderApp();
+    }
+
+    function chooseDifficulty(level) {
+      state.difficulty = level;
+      state.batches = generateBatches();
+      const count = getDifficultyItemCount();
+      const copies = getDifficultyCopies();
+      if (level === 1) {
+        showHint("info", `已選擇 Level 1 入門模式，每批共 ${count} 件貨品，請打開貨箱開始訓練。`);
+        speak(`Level 1 入門模式：每批 ${count} 件貨品（9款 × ${copies}件）。先打開貨箱，開始今天的訓練。`);
+      } else {
+        showHint("info", `已選擇 Level 2 標準模式，每批共 ${count} 件貨品，請打開貨箱開始訓練。`);
+        speak(`Level 2 標準模式：每批 ${count} 件貨品（9款 × ${copies}件）。先打開貨箱，開始今天的訓練。`);
+      }
       renderApp();
     }
 
@@ -383,8 +417,9 @@
       state.activeBatch = state.batches[randomIndex].map((item) => ({ ...item }));
       state.scanned = {};
       state.stage = 1;
-      showHint("success", "已選中 1 批，共 27 件，請開始掃描條碼。");
-      speak("很好，這批貨一共有 27 件。先逐件掃描條碼，確認每件貨都已入系統。");
+      const batchCount = state.activeBatch.length;
+      showHint("success", `已選中 1 批，共 ${batchCount} 件，請開始掃描條碼。`);
+      speak(`很好，這批貨一共有 ${batchCount} 件。先逐件掃描條碼，確認每件貨都已入系統。`);
       renderApp();
     }
 
@@ -397,11 +432,12 @@
       const item = getItem(uid);
       if (item) item.scanned = true;
       const scannedCount = Object.keys(state.scanned).length;
-      if (scannedCount === 27) {
-        showHint("success", "27 件已全數掃描完成，可以進入下一步。");
+      const totalCount = state.activeBatch.length;
+      if (scannedCount === totalCount) {
+        showHint("success", `${totalCount} 件已全數掃描完成，可以進入下一步。`);
         speak("條碼掃描完成，接下來把貨品分到正確類別貨架。");
       } else {
-        showHint("success", `已掃描 ${scannedCount} / 27：${item.name} #${item.copyNo}`);
+        showHint("success", `已掃描 ${scannedCount} / ${totalCount}：${item.name} #${item.copyNo}`);
       }
       renderApp();
     }
@@ -424,7 +460,7 @@
     function checkStage2() {
       const allPlaced = CATEGORY_ORDER.every((zone) => state.stage2Zones[zone].length > 0) && state.stage2Zones.pool.length === 0;
       if (!allPlaced) {
-        penalize("分類尚未完成，27 件貨品必須全部放到三個類別架。");
+        penalize(`分類尚未完成，${state.activeBatch.length} 件貨品必須全部放到三個類別架。`);
         renderApp();
         return;
       }
@@ -441,7 +477,7 @@
         penalize("分類有誤：" + wrongItems.slice(0, 3).join("、"));
       } else {
         state.stage2Passed = true;
-        showHint("success", "分類正確，27 件貨品都已回到對應類別。");
+        showHint("success", `分類正確，${state.activeBatch.length} 件貨品都已回到對應類別。`);
         speak("分類做得不錯。現在要判斷哪些貨可以上架，哪些要列作損壞或過期。");
       }
       renderApp();
@@ -646,7 +682,7 @@
     }
 
     function nextStage() {
-      if (state.stage === 1 && Object.keys(state.scanned).length === 27) {
+      if (state.stage === 1 && Object.keys(state.scanned).length === state.activeBatch.length) {
         state.stage = 2;
         state.stage2Zones = {
           pool: createMixedStage2Pool(state.activeBatch),
@@ -654,7 +690,7 @@
           "飲品類": [],
           "乾貨": []
         };
-        showHint("info", "開始分類：把 27 件貨品拖到正確類別架。");
+        showHint("info", `開始分類：把 ${state.activeBatch.length} 件貨品拖到正確類別架。`);
         speak("現在請把全部貨品分到罐頭食品、飲品類、乾貨三個架上。");
       } else if (state.stage === 2 && state.stage2Passed) {
         state.stage = 3;
@@ -810,6 +846,7 @@
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div class="flex flex-wrap items-center gap-3">
                 <span class="rounded-full border border-slate-400/25 bg-slate-900/55 px-3 py-1 text-sm text-slate-200">固定日期：${TODAY}</span>
+                ${state.difficulty !== null ? `<span class="rounded-full border ${state.difficulty === 1 ? "border-sky-400/35 bg-sky-400/15 text-sky-200" : "border-amber-400/35 bg-amber-400/15 text-amber-200"} px-3 py-1 text-sm font-medium">Level ${state.difficulty}</span>` : ""}
                 <span class="text-sm text-slate-300">${progressText()}</span>
               </div>
               <div class="flex items-center gap-3">
@@ -851,6 +888,57 @@
       }
     }
 
+    function setupDifficultySelect() {
+      const main = document.getElementById("main-panel");
+      main.innerHTML = `
+        <section class="shelf-panel glass rounded-[2rem] border p-5 md:p-6">
+          <div class="relative z-10">
+            <div class="mb-6">
+              <p class="text-xs uppercase tracking-[0.28em] text-sky-200/70">選擇難度</p>
+              <h1 class="mt-1 text-2xl font-semibold text-white md:text-3xl">O2O 達人店長訓練</h1>
+              <p class="mt-2 max-w-2xl text-sm leading-7 text-slate-300">請選擇今次訓練的難度，開始收貨上架練習。</p>
+            </div>
+
+            <div class="grid gap-4 md:grid-cols-2">
+              <button id="level1-btn" class="group rounded-3xl border border-sky-400/25 bg-sky-400/8 p-6 text-left transition hover:border-sky-300/45 hover:bg-sky-400/15">
+                <div class="text-4xl">📦</div>
+                <div class="mt-4 text-xl font-semibold text-white">Level 1</div>
+                <div class="mt-1 text-sm font-medium text-sky-300">入門模式</div>
+                <div class="mt-4 space-y-2 text-sm text-slate-300">
+                  <div>每批 <span class="font-semibold text-sky-200">18 件</span>貨品（9款 × 每款 2 件）</div>
+                  <div class="text-xs text-slate-400">損壞：3 件 ｜ 過期：3 件</div>
+                </div>
+                <div class="mt-4 rounded-2xl border border-sky-400/20 bg-sky-950/30 px-3 py-2 text-xs text-sky-100/80">適合初次訓練，貨品數量較少，輕鬆完成各流程</div>
+              </button>
+
+              <button id="level2-btn" class="group rounded-3xl border border-amber-400/25 bg-amber-400/8 p-6 text-left transition hover:border-amber-300/45 hover:bg-amber-400/15">
+                <div class="text-4xl">🏪</div>
+                <div class="mt-4 text-xl font-semibold text-white">Level 2</div>
+                <div class="mt-1 text-sm font-medium text-amber-300">標準模式</div>
+                <div class="mt-4 space-y-2 text-sm text-slate-300">
+                  <div>每批 <span class="font-semibold text-amber-200">27 件</span>貨品（9款 × 每款 3 件）</div>
+                  <div class="text-xs text-slate-400">損壞：5 件 ｜ 過期：5 件</div>
+                </div>
+                <div class="mt-4 rounded-2xl border border-amber-400/20 bg-amber-950/30 px-3 py-2 text-xs text-amber-100/80">完整版挑戰，更多貨品，真實模擬門店上架流程</div>
+              </button>
+            </div>
+
+            <section class="mt-6 glass rounded-3xl border p-4">
+              <h3 class="text-sm font-semibold text-white">兩個 Level 的遊戲規則完全相同</h3>
+              <ol class="mt-3 grid gap-2 text-sm leading-7 text-slate-300 md:grid-cols-2">
+                <li><span class="text-sky-200">步驟1 掃描</span>：逐件掃碼入庫</li>
+                <li><span class="text-sky-200">步驟2 分類</span>：分類到罐頭／飲品／乾貨</li>
+                <li><span class="text-sky-200">步驟3 判斷</span>：可上架／已損壞／已過期</li>
+                <li><span class="text-sky-200">步驟4 排序</span>：按有效日期由早到晚上架</li>
+              </ol>
+            </section>
+          </div>
+        </section>
+      `;
+      document.getElementById("level1-btn").addEventListener("click", () => chooseDifficulty(1));
+      document.getElementById("level2-btn").addEventListener("click", () => chooseDifficulty(2));
+    }
+
     function setupIntro() {
       const main = document.getElementById("main-panel");
       main.innerHTML = `
@@ -858,11 +946,11 @@
           <div class="relative z-10">
             <div class="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
-                <p class="text-xs uppercase tracking-[0.28em] text-sky-200/70">Stage 0</p>
+                <p class="text-xs uppercase tracking-[0.28em] text-sky-200/70">Stage 0 · Level ${state.difficulty}</p>
                 <h1 class="mt-1 text-2xl font-semibold text-white md:text-3xl">開場：準備打開貨箱</h1>
-                <p class="mt-2 max-w-2xl text-sm leading-7 text-slate-300">本次訓練會從 5 批來貨中隨機抽出 1 批，內含 27 件商品，請依流程完成掃描、分類、判斷與上架排序。</p>
+                <p class="mt-2 max-w-2xl text-sm leading-7 text-slate-300">本次訓練會從 5 批來貨中隨機抽出 1 批，內含 ${getDifficultyItemCount()} 件商品，請依流程完成掃描、分類、判斷與上架排序。</p>
               </div>
-              <div class="rounded-2xl border border-slate-400/20 bg-slate-950/35 px-4 py-3 text-sm text-slate-200">每批：9 款商品 x 每款 3 件 = 27 件</div>
+              <div class="rounded-2xl border border-slate-400/20 bg-slate-950/35 px-4 py-3 text-sm text-slate-200">每批：9 款商品 x 每款 ${getDifficultyCopies()} 件 = ${getDifficultyItemCount()} 件</div>
             </div>
 
             <div class="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
@@ -887,7 +975,7 @@
               <article class="glass rounded-3xl border p-4">
                 <h3 class="text-base font-semibold text-white">訓練內容（4 步實戰）</h3>
                 <ol class="mt-3 space-y-2 text-sm leading-7 text-slate-300">
-                  <li><span class="text-emerald-200">步驟1 掃描</span>：27 件逐一掃碼入庫，完成先可進入下一關。</li>
+                  <li><span class="text-emerald-200">步驟1 掃描</span>：${getDifficultyItemCount()} 件逐一掃碼入庫，完成先可進入下一關。</li>
                   <li><span class="text-emerald-200">步驟2 分類</span>：從打散貨池分類到罐頭／飲品／乾貨，錯誤會扣分。</li>
                   <li><span class="text-emerald-200">步驟3 判斷</span>：按「可上架／已損壞／已過期」完成品質與時效判定。</li>
                   <li><span class="text-emerald-200">步驟4 排序</span>：以類別分頁，同名商品按有效日期由早到晚完成上架序。</li>
@@ -897,12 +985,19 @@
 
             <div class="mt-6 flex flex-wrap gap-3">
               <button id="open-batch-btn" class="rounded-2xl bg-gradient-to-r from-sky-400 to-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-sky-950/30 transition hover:brightness-110">打開貨箱</button>
+              <button id="change-level-btn" class="rounded-2xl border border-slate-300/20 bg-slate-900/40 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:border-sky-300/30">更換難度</button>
               <button id="reset-btn-intro" class="rounded-2xl border border-slate-300/20 bg-slate-900/40 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:border-sky-300/30">重新訓練</button>
             </div>
           </div>
         </section>
       `;
       document.getElementById("open-batch-btn").addEventListener("click", chooseBatch);
+      document.getElementById("change-level-btn").addEventListener("click", () => {
+        state.difficulty = null;
+        showHint("info", "請重新選擇難度。");
+        speak("請選擇想要的難度，再開始今次訓練。");
+        renderApp();
+      });
       document.getElementById("reset-btn-intro").addEventListener("click", resetTraining);
     }
 
@@ -915,10 +1010,10 @@
             <div class="mb-5 flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
               <div>
                 <p class="text-xs uppercase tracking-[0.28em] text-sky-200/70">Step 1</p>
-                <h1 class="mt-1 text-2xl font-semibold text-white md:text-3xl">步驟1：27件條碼掃描</h1>
-                <p class="mt-2 text-sm text-slate-300">逐件點擊條碼掃描，全部 27 件都完成後才可以進入下一步。</p>
+                <h1 class="mt-1 text-2xl font-semibold text-white md:text-3xl">步驟1：${state.activeBatch.length}件條碼掃描</h1>
+                <p class="mt-2 text-sm text-slate-300">逐件點擊條碼掃描，全部 ${state.activeBatch.length} 件都完成後才可以進入下一步。</p>
               </div>
-              <div class="rounded-2xl border border-sky-300/20 bg-sky-400/10 px-4 py-3 text-sm text-sky-100">已掃描 ${scannedCount} / 27</div>
+              <div class="rounded-2xl border border-sky-300/20 bg-sky-400/10 px-4 py-3 text-sm text-sky-100">已掃描 ${scannedCount} / ${state.activeBatch.length}</div>
             </div>
 
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
@@ -928,7 +1023,7 @@
         </section>
         <div class="mt-4 flex flex-wrap justify-end gap-3">
           <button id="reset-btn" class="rounded-2xl border border-slate-300/20 bg-slate-900/40 px-5 py-3 text-sm font-semibold text-slate-100 transition hover:border-sky-300/30">重新訓練</button>
-          ${scannedCount === 27 ? `<button id="next-btn" class="rounded-2xl bg-gradient-to-r from-sky-400 to-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-sky-950/30 transition hover:brightness-110">下一步</button>` : ""}
+          ${scannedCount === state.activeBatch.length ? `<button id="next-btn" class="rounded-2xl bg-gradient-to-r from-sky-400 to-cyan-300 px-5 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-sky-950/30 transition hover:brightness-110">下一步</button>` : ""}
         </div>
       `;
 
@@ -947,8 +1042,8 @@
           <div class="relative z-10">
             <div class="mb-5">
               <p class="text-xs uppercase tracking-[0.28em] text-sky-200/70">Step 2</p>
-              <h1 class="mt-1 text-2xl font-semibold text-white md:text-3xl">步驟2：27件貨品拖放分類</h1>
-              <p class="mt-2 text-sm leading-7 text-slate-300">把待分類池的 27 件貨品放到正確的三個類別架。檢查錯誤會扣 10 分，全對才能進下一步。</p>
+              <h1 class="mt-1 text-2xl font-semibold text-white md:text-3xl">步驟2：${state.activeBatch.length}件貨品拖放分類</h1>
+              <p class="mt-2 text-sm leading-7 text-slate-300">把待分類池的 ${state.activeBatch.length} 件貨品放到正確的三個類別架。檢查錯誤會扣 10 分，全對才能進下一步。</p>
             </div>
             <section class="mb-4 glass rounded-3xl border border-sky-300/20 bg-sky-400/10 p-4">
               <h3 class="text-sm font-semibold text-sky-100">分類提示（易錯位請先對照）</h3>
@@ -1247,7 +1342,9 @@
       `;
       renderStatus();
 
-      if (state.stage === 0) {
+      if (state.difficulty === null) {
+        setupDifficultySelect();
+      } else if (state.stage === 0) {
         setupIntro();
       } else if (state.stage === 1) {
         setupStage1();
